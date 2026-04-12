@@ -17,7 +17,7 @@ export async function testEnvironment(
 ): Promise<AdapterEnvironmentTestResult> {
   const checks: AdapterEnvironmentCheck[] = [];
   const config = parseObject(ctx.config);
-  const command = asString(config.command, "");
+  const command = asString(config.command, "hermes");
 
   if (!command) {
     checks.push({
