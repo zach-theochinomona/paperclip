@@ -43,12 +43,19 @@ function buildHermesBootstrapPrompt(
   const { runId, agent, context } = ctx;
   const agentName = asString(agent.name, "hermes-agent");
 
-  // Build task description from context
+  // Build task description from context — include actual content, not just IDs
   const taskParts: string[] = [];
-  if (context.issueId) taskParts.push(`Issue: ${context.issueId}`);
-  if (context.taskId) taskParts.push(`Task: ${context.taskId}`);
-  if (context.wakeReason) taskParts.push(`Wake reason: ${context.wakeReason}`);
-  const taskDescription = taskParts.join("; ") || `Agent run ${runId}`;
+  const issueTitle = asString(context.issueTitle, "");
+  const issueBody = asString(context.issueBody, asString(context.prompt, ""));
+  const taskId = asString(context.taskId, "");
+
+  if (issueTitle) taskParts.push(`## Task: ${issueTitle}`);
+  if (issueBody) taskParts.push(`\n${issueBody}`);
+  if (!issueTitle && !issueBody) {
+    taskParts.push(`Agent run ${runId} — no specific task provided.`);
+  }
+
+  const taskDescription = taskParts.join("\n");
 
   // Build Cabinet bootstrap
   const cabinetBootstrap = buildCabinetBootstrapPrompt(cabinetConfig, {
@@ -132,13 +139,19 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     });
   }
 
-  // Run the hermes process with the bootstrap prompt
-  // The prompt is passed via PAPERCLIP_BOOTSTRAP_PROMPT env var
-  if (bootstrapPrompt || cabinetContext) {
-    env.PAPERCLIP_BOOTSTRAP_PROMPT = bootstrapPrompt + cabinetContext;
-  }
+  // Run hermes non-interactively with the task prompt
+  // Use: hermes chat -q "prompt" --yolo --max-turns 90
+  const fullPrompt = [bootstrapPrompt, cabinetContext].filter(Boolean).join("\n");
 
-  const proc = await runChildProcess(runId, command, args, {
+  const hermesArgs = [
+    "chat",
+    "-q", fullPrompt || "Respond with hello and confirm you are running.",
+    "--yolo",
+    "--max-turns", "90",
+    ...args,
+  ];
+
+  const proc = await runChildProcess(runId, command, hermesArgs, {
     cwd,
     env: runtimeEnv,
     timeoutSec,
