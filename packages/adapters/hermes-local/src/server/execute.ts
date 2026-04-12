@@ -75,8 +75,7 @@ function buildHermesBootstrapPrompt(
 
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
   const { runId, agent, config, onLog, onMeta } = ctx;
-  const command = asString(config.command, "");
-  if (!command) throw new Error("Hermes adapter missing command");
+  const command = asString(config.command, "hermes");
 
   const args = asStringArray(config.args);
   const cwd = asString(config.cwd, process.cwd());
