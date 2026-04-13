@@ -1,8 +1,18 @@
 import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
+  AdapterRuntimeServiceReport,
 } from "@paperclipai/adapter-utils";
 import { asString, asNumber, parseObject, buildPaperclipEnv } from "@paperclipai/adapter-utils/server-utils";
+import {
+  resolveCabinetConfig,
+  appendMemory,
+  readMemory,
+  searchMemory,
+  buildCabinetBootstrapPrompt,
+  buildTaskCompletionEntry,
+  type CabinetConfig,
+} from "./cabinet.js";
 
 const DEFAULT_ENDPOINT = "http://localhost:18789";
 
@@ -130,6 +140,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const timeoutMs = timeoutSec * 1000;
   const headers = buildHeaders(config);
 
+  // Resolve Cabinet config
+  const cabinetConfig = resolveCabinetConfig(config);
+
   // Build task context
   const taskContext: Record<string, unknown> = {
     runId,
@@ -141,6 +154,36 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   if (ctx.context.taskId) taskContext.taskId = ctx.context.taskId;
   if (ctx.context.wakeReason) taskContext.wakeReason = ctx.context.wakeReason;
 
+  // Build Cabinet bootstrap prompt
+  const agentName = asString(agent.name, "openclaw-agent");
+  const issueTitle = asString(ctx.context.issueTitle, "");
+  const issueBody = asString(ctx.context.issueBody, asString(ctx.context.prompt, ""));
+  const taskParts: string[] = [];
+  if (issueTitle) taskParts.push(`## Task: ${issueTitle}`);
+  if (issueBody) taskParts.push(`\n${issueBody}`);
+  if (!issueTitle && !issueBody) {
+    taskParts.push(`Agent run ${runId} — no specific task provided.`);
+  }
+  const taskDescription = taskParts.join("\n");
+
+  const cabinetBootstrap = buildCabinetBootstrapPrompt(cabinetConfig, {
+    agentName,
+    taskDescription,
+    runId,
+  });
+
+  // If Cabinet pull mode, try to read relevant memory before execution
+  let cabinetContext = "";
+  if (
+    (cabinetConfig.memorySync === "pull" || cabinetConfig.memorySync === "bidirectional") &&
+    cabinetConfig.slug
+  ) {
+    const readResult = await readMemory(cabinetConfig, "context.md");
+    if (readResult.ok && readResult.content) {
+      cabinetContext = `\n## Cabinet Memory (pre-loaded)\n\n${readResult.content}\n\n`;
+    }
+  }
+
   // Build session params
   const payloadTemplate = parseObject(config.payloadTemplate);
   const sessionParams = {
@@ -149,6 +192,8 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     sessionKey,
     context: taskContext,
     paperclipEnv: buildPaperclipEnv(agent),
+    // Include Cabinet context in the session
+    cabinetContext: cabinetBootstrap + cabinetContext,
   };
 
   if (onMeta) {
@@ -158,6 +203,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       cwd: undefined,
       commandArgs: [],
       env: {},
+      prompt: cabinetBootstrap + cabinetContext,
     });
   }
 
@@ -194,6 +240,44 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     onLog,
   );
 
+  // Capture result output for Cabinet memory append
+  const resultOutput = result.output || "";
+  const exitCode = result.error ? 1 : 0;
+
+  // Cabinet memory push: append task completion to Cabinet
+  if (
+    (cabinetConfig.memorySync === "push" || cabinetConfig.memorySync === "bidirectional") &&
+    cabinetConfig.slug &&
+    cabinetConfig.autoAppend
+  ) {
+    const entry = buildTaskCompletionEntry({
+      agentName,
+      runId,
+      taskDescription,
+      result: resultOutput.slice(0, 4000),
+      exitCode,
+    });
+
+    // Fire-and-forget Cabinet append (don't block on Cabinet availability)
+    appendMemory(cabinetConfig, entry).catch((err) => {
+      if (onLog) {
+        onLog("stderr", `[openclaw_local] Cabinet append failed: ${err.message || err}`);
+      }
+    });
+  }
+
+  // Build runtime service reports for Cabinet status
+  const runtimeServices: AdapterRuntimeServiceReport[] = [];
+  if (cabinetConfig.memorySync !== "off" && cabinetConfig.slug) {
+    runtimeServices.push({
+      serviceId: `cabinet:${cabinetConfig.slug}`,
+      label: "Cabinet Memory",
+      status: "running",
+      detail: `Slug: ${cabinetConfig.slug}, Sync: ${cabinetConfig.memorySync}`,
+      endpoint: cabinetConfig.endpoint,
+    });
+  }
+
   if (result.error) {
     return {
       exitCode: 1,
@@ -203,6 +287,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       resultJson: {
         sessionId,
         output: result.output,
+      },
+      meta: {
+        runtimeServices,
       },
     };
   }
@@ -214,6 +301,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     resultJson: {
       sessionId,
       output: result.output,
+    },
+    meta: {
+      runtimeServices,
     },
   };
 }
