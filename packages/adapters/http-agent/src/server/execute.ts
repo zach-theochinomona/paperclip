@@ -1,8 +1,18 @@
 import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
+  AdapterRuntimeServiceReport,
 } from "@paperclipai/adapter-utils";
 import { asString, asNumber, parseObject, buildPaperclipEnv } from "@paperclipai/adapter-utils/server-utils";
+import {
+  resolveCabinetConfig,
+  appendMemory,
+  readMemory,
+  writeMemory,
+  buildCabinetBootstrapPrompt,
+  buildTaskCompletionEntry,
+  type CabinetConfig,
+} from "./cabinet.js";
 
 function getNestedValue(obj: unknown, path: string): unknown {
   if (!path) return obj;

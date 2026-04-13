@@ -195,11 +195,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const runtimeServices: AdapterRuntimeServiceReport[] = [];
   if (cabinetConfig.memorySync !== "off" && cabinetConfig.slug) {
     runtimeServices.push({
-      serviceId: `cabinet:${cabinetConfig.slug}`,
-      label: "Cabinet Memory",
+      serviceName: `cabinet:${cabinetConfig.slug}`,
       status: "running",
-      detail: `Slug: ${cabinetConfig.slug}, Sync: ${cabinetConfig.memorySync}`,
-      endpoint: cabinetConfig.endpoint,
+      url: cabinetConfig.endpoint,
     });
   }
 
