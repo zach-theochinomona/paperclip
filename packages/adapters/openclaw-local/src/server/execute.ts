@@ -13,6 +13,7 @@ import {
   buildTaskCompletionEntry,
   type CabinetConfig,
 } from "./cabinet.js";
+import { createOpenClawClient, OpenClawGatewayClient } from "./gateway-client.js";
 
 const DEFAULT_ENDPOINT = "http://localhost:18789";
 
