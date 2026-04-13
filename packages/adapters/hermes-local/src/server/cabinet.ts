@@ -21,8 +21,9 @@ export function resolveCabinetConfig(config: Record<string, unknown>): CabinetCo
   const syncRaw = asString(config.cabinetMemorySync, "push").trim().toLowerCase();
   const autoAppend = asBool(config.cabinetAutoAppend, true);
 
+  const validModes = ["bidirectional", "push", "pull", "off"];
   const memorySync = (
-    ["bidirectional", "push", "pull", "off"].includes(syncRaw) ? syncRaw : "push"
+    validModes.indexOf(syncRaw) >= 0 ? syncRaw : "push"
   ) as CabinetConfig["memorySync"];
 
   return { endpoint, slug, memorySync, autoAppend };

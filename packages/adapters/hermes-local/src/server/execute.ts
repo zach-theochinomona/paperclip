@@ -207,9 +207,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       signal: proc.signal,
       timedOut: true,
       errorMessage: `Timed out after ${timeoutSec}s`,
-      meta: {
-        runtimeServices,
-      },
+      runtimeServices,
     };
   }
 
@@ -223,9 +221,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         stdout: proc.stdout,
         stderr: proc.stderr,
       },
-      meta: {
-        runtimeServices,
-      },
+      runtimeServices,
     };
   }
 
@@ -237,8 +233,6 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       stdout: proc.stdout,
       stderr: proc.stderr,
     },
-    meta: {
-      runtimeServices,
-    },
+    runtimeServices,
   };
 }
