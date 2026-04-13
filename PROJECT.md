@@ -57,14 +57,41 @@ pnpm dev
 2. Test each adapter with Paperclip agents
 3. Create PRs for review
 
-### Recent Changes
-- Created `packages/adapters/hermes-local/` — hermes_local adapter with Cabinet memory sync
-- Created `packages/adapters/openclaw-local/` — REST API adapter for OpenClaw gateway (port 18789)
-- Created `packages/adapters/http-agent/` — Generic HTTP adapter for remote agents
-- Updated `server/src/adapters/builtin-adapter-types.ts` — Added new adapter types
-- Updated `server/src/adapters/registry.ts` — Registered new adapters
-- Updated `server/package.json` — Added workspace dependencies
+### Recent Changes (2026-04-13)
 
+### Agent Platform Integration Enhancements
+
+#### OpenClaw Adapter + Cabinet Integration
+- Added `cabinet.ts` with full Cabinet memory API functions (append, read, list, search)
+- Updated `execute.ts` to integrate Cabinet context into agent sessions
+- Added bootstrap prompt with Cabinet instructions
+- Added task completion memory append after agent runs
+- Added runtime service report for Cabinet status
+
+#### HTTP Agent Adapter + Cabinet Integration  
+- Created `cabinet.ts` with Cabinet memory API functions (append, read, write, list, search)
+- Updated `execute.ts` to integrate Cabinet context into agent sessions
+- Added bootstrap prompt with Cabinet instructions
+- Added task completion memory append after agent runs
+- Added runtime service report for Cabinet status
+
+#### Hermes Adapter Fixes
+- Fixed `AdapterRuntimeServiceReport` to use correct interface (`serviceName`, `status`, `url`)
+- Fixed type errors in `runtimeServices.push()`
+- Updated `tsconfig.json` to explicitly include ES2023 and DOM libs
+
+#### Type System Improvements
+- Fixed `AdapterExecutionResult` to use `runtimeServices` directly (not in `meta` object)
+- Fixed `cabinet.ts` to use `indexOf` instead of `includes` for ES5 compatibility
+- Resolved Promise constructor errors and module resolution issues
+
+### All Adapters Now Have Consistent Cabinet Integration
+All three adapters (Hermes, OpenClaw, HTTP Agent) now follow the same pattern:
+1. Cabinet config resolution from adapter config
+2. Bootstrap prompt with Cabinet context
+3. Pre-execution memory pull (if bidirectional/pull mode)
+4. Post-execution memory push (if bidirectional/push mode)
+5. Runtime service report for Cabinet status
 ## Architecture
 
 ```
